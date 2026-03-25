@@ -48,7 +48,7 @@
   <div class="logo-area">
     <h1>Apex RN Prep</h1>
     <p>Certificate of Completion Generator</p>
-    <p class="version">v8.1 &mdash; March 25, 2026</p>
+    <p class="version">v9 &mdash; March 25, 2026</p>
   </div>
   <hr>
   <label for="studentName">Student Name</label>
@@ -63,6 +63,8 @@
       <input type="date" id="toDate" />
     </div>
   </div>
+  <label for="studentEmail">Student Email <span style="font-weight:400;color:#9ca3af;">(optional — creates Gmail draft)</span></label>
+  <input type="email" id="studentEmail" placeholder="e.g. student@example.com" />
   <button id="genBtn" onclick="generateCertificate()">&#8675; Generate Certificate</button>
   <div id="status"></div>
 </div>
@@ -586,8 +588,38 @@ async function generateCertificate() {
     const safe = name.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_');
     doc.save('Certificate_' + safe + '.pdf');
 
-    status.className = 'success';
-    status.textContent = '\u2713 Certificate downloaded!';
+    // 6. If student email provided, send PDF to Apps Script to create Gmail draft
+    const email = document.getElementById('studentEmail').value.trim();
+    if (email) {
+      status.className = '';
+      status.textContent = 'Certificate downloaded. Creating email draft...';
+      try {
+        const pdfBase64 = doc.output('datauristring').split(',')[1];
+        const payload = {
+          studentName: name,
+          studentEmail: email,
+          fromDate: from,
+          toDate: to,
+          pdfBase64: pdfBase64
+        };
+        const MAILER_URL = 'https://script.google.com/macros/s/AKfycbykZCkyLoGzIPyfI1ZIXk7lvC9EVzzQ-77TywGy0AGgjecRogDdrZ5vdjUjWC0lC_g/exec';
+        const resp = await fetch(MAILER_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payload)
+        });
+        status.className = 'success';
+        status.textContent = '\u2713 Certificate downloaded & email draft created!';
+      } catch (mailErr) {
+        console.error('Mailer error:', mailErr);
+        status.className = 'success';
+        status.textContent = '\u2713 Certificate downloaded! (Email draft failed: ' + mailErr.message + ')';
+      }
+    } else {
+      status.className = 'success';
+      status.textContent = '\u2713 Certificate downloaded!';
+    }
   } catch (err) {
     console.error(err);
     status.className = 'error';
