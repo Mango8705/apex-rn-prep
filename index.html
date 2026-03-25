@@ -532,6 +532,13 @@ async function generateCertificate() {
     // 1. Draw background
     ctx.drawImage(bgImage, 0, 0, CW, CH);
 
+    // 1b. Fill white margins at top/bottom of original PNG by extending edge rows
+    // The Canva export has ~35px white at top and ~36px white at bottom
+    const topRow = ctx.getImageData(0, 36, CW, 1);
+    for (let y = 0; y < 36; y++) ctx.putImageData(topRow, 0, y);
+    const botRow = ctx.getImageData(0, 1663, CW, 1);
+    for (let y = 1664; y < CH; y++) ctx.putImageData(botRow, 0, y);
+
     const navy = '#02316a';
 
     // 2. White out — precise boxes from pixel analysis of original PNG
@@ -573,8 +580,8 @@ async function generateCertificate() {
       format: [792, 612],
       compress: true
     });
-    // Overfill by 3pt on each side to eliminate any white border
-    doc.addImage(imgData, 'JPEG', -3, -3, 798, 618);
+    // Slight overfill to eliminate any sub-pixel white border
+    doc.addImage(imgData, 'JPEG', -1, -1, 794, 614);
 
     const safe = name.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_');
     doc.save('Certificate_' + safe + '.pdf');
