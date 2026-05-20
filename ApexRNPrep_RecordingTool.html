@@ -56,7 +56,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 <div class="app">
   <div class="panel" id="signinPanel">
     <h2>Recording Link Generator</h2>
-    <p class="version">v8 &mdash; May 2026</p>
+    <p class="version">v9 &mdash; May 2026</p>
     <hr>
     <p style="font-size:13px;color:#374151;margin-bottom:8px">Sign in with your Apex RN Prep account.</p>
     <button class="btn" id="signinBtn">Sign in with Microsoft</button>
@@ -66,12 +66,29 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 
   <div class="panel hidden" id="mainPanel">
     <h2>Generate Recording Link</h2>
-    <p class="version">v8 &mdash; May 2026</p>
+    <p class="version">v9 &mdash; May 2026</p>
     <div id="signedAs"></div>
     <hr>
 
-    <label>Class Date</label>
-    <input type="date" id="classDate">
+    <label>Search by</label>
+    <div class="row" style="gap:8px;margin-bottom:8px">
+      <label style="display:flex;align-items:center;font-weight:400;margin:0;cursor:pointer">
+        <input type="radio" name="searchMode" value="date" id="modeDate" checked style="width:auto;margin-right:6px"> Date
+      </label>
+      <label style="display:flex;align-items:center;font-weight:400;margin:0;cursor:pointer">
+        <input type="radio" name="searchMode" value="topic" id="modeTopic" style="width:auto;margin-right:6px"> Topic / filename
+      </label>
+    </div>
+
+    <div id="dateSearchRow">
+      <label>Class Date</label>
+      <input type="date" id="classDate">
+    </div>
+
+    <div id="topicSearchRow" class="hidden">
+      <label>Topic keyword (matches filename)</label>
+      <input type="text" id="topicQuery" placeholder="e.g. Cardiac, Pharmacology, Maternity">
+    </div>
 
     <button class="btn btn-secondary" id="findBtn">Find &amp; Add Recording</button>
     <div id="status"></div>
@@ -206,13 +223,7 @@ function makePasscode(){
 }
 
 async function findRecording(){
-  var dateStr = el("classDate").value;
-  if (!dateStr) { setStatus("Pick a class date first.", "error"); return; }
-  // Prevent duplicates
-  if (addedRecordings.some(function(a){ return a.date === dateStr; })) {
-    setStatus("That date is already in the list. Remove it first if you want a different recording.", "error");
-    return;
-  }
+  var mode = document.querySelector('input[name="searchMode"]:checked').value;
   el("pickerContainer").classList.add("hidden");
   setStatus("Searching OneDrive…", "info");
   try {
@@ -222,19 +233,31 @@ async function findRecording(){
     if (!resp.ok) { var err = await resp.text(); throw new Error("Graph " + resp.status + ": " + err); }
     var data = await resp.json();
     var all = (data.value || []).filter(function(f){ return f.file; });
-    var target = new Date(dateStr + "T00:00:00");
-    var targetEnd = new Date(target.getTime() + 86400000);
-    var matches = all.filter(function(f){
-      var c = new Date(f.createdDateTime);
-      return c >= target && c < targetEnd;
-    });
-    if (matches.length === 0) {
-      setStatus("No recordings created on " + dateStr + ". Folder has " + all.length + " files total.", "error");
-      return;
+    var matches = [];
+    if (mode === "date") {
+      var dateStr = el("classDate").value;
+      if (!dateStr) { setStatus("Pick a class date first.", "error"); return; }
+      var target = new Date(dateStr + "T00:00:00");
+      var targetEnd = new Date(target.getTime() + 86400000);
+      matches = all.filter(function(f){
+        var c = new Date(f.createdDateTime);
+        return c >= target && c < targetEnd;
+      });
+      if (matches.length === 0) {
+        setStatus("No recordings created on " + dateStr + ". Folder has " + all.length + " files total.", "error");
+        return;
+      }
+    } else {
+      var q = el("topicQuery").value.trim().toLowerCase();
+      if (!q) { setStatus("Enter a topic keyword first.", "error"); return; }
+      matches = all.filter(function(f){ return f.name.toLowerCase().indexOf(q) !== -1; });
+      if (matches.length === 0) {
+        setStatus("No recordings with \"" + q + "\" in the filename. Folder has " + all.length + " files total.", "error");
+        return;
+      }
     }
-    // Always show picker so user can review before adding
     pickerCandidates = matches;
-    pickerSelectedIdx = matches.length === 1 ? 0 : null;  // pre-select if only one
+    pickerSelectedIdx = matches.length === 1 ? 0 : null;
     renderPicker();
     el("pickerContainer").classList.remove("hidden");
     clearStatus();
@@ -264,8 +287,15 @@ function renderPicker(){
 
 function addPicked(){
   if (pickerSelectedIdx === null) { setStatus("Pick a recording first.", "error"); return; }
-  var dateStr = el("classDate").value;
-  addRecording(dateStr, pickerCandidates[pickerSelectedIdx]);
+  var file = pickerCandidates[pickerSelectedIdx];
+  // Always use the recording's actual creation date (YYYY-MM-DD), regardless of search mode
+  var dateStr = new Date(file.createdDateTime).toISOString().substring(0, 10);
+  // Prevent duplicate of same file
+  if (addedRecordings.some(function(a){ return a.file.id === file.id; })) {
+    setStatus("That recording is already in the list.", "error");
+    return;
+  }
+  addRecording(dateStr, file);
   el("pickerContainer").classList.add("hidden");
 }
 
@@ -402,9 +432,17 @@ function resetAll(){
   clearStatus();
 }
 
+function updateSearchMode(){
+  var mode = document.querySelector('input[name="searchMode"]:checked').value;
+  el("dateSearchRow").classList.toggle("hidden", mode !== "date");
+  el("topicSearchRow").classList.toggle("hidden", mode !== "topic");
+}
+
 document.addEventListener("DOMContentLoaded", function(){
   el("signinBtn").addEventListener("click", signIn);
   el("findBtn").addEventListener("click", findRecording);
+  el("modeDate").addEventListener("change", updateSearchMode);
+  el("modeTopic").addEventListener("change", updateSearchMode);
   el("addPickedBtn").addEventListener("click", addPicked);
   el("cancelPickerBtn").addEventListener("click", cancelPicker);
   el("generateBtn").addEventListener("click", generateAll);
