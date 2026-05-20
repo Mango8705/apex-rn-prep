@@ -56,7 +56,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 <div class="app">
   <div class="panel" id="signinPanel">
     <h2>Recording Link Generator</h2>
-    <p class="version">v9 &mdash; May 2026</p>
+    <p class="version">v10 &mdash; May 2026</p>
     <hr>
     <p style="font-size:13px;color:#374151;margin-bottom:8px">Sign in with your Apex RN Prep account.</p>
     <button class="btn" id="signinBtn">Sign in with Microsoft</button>
@@ -66,7 +66,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 
   <div class="panel hidden" id="mainPanel">
     <h2>Generate Recording Link</h2>
-    <p class="version">v9 &mdash; May 2026</p>
+    <p class="version">v10 &mdash; May 2026</p>
     <div id="signedAs"></div>
     <hr>
 
@@ -114,6 +114,14 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 
     <label>Link expires in (days)</label>
     <input type="number" id="expiryDays" value="3" min="1" max="30">
+
+    <label style="display:flex;align-items:center;font-weight:400;margin-top:13px;cursor:pointer">
+      <input type="checkbox" id="restrictEmail" checked style="width:auto;margin-right:8px;flex-shrink:0">
+      <span style="font-size:13px">Restrict to recipient email only (recommended)</span>
+    </label>
+    <div style="font-size:11px;color:#6b7280;margin-top:4px;padding-left:24px" id="restrictHint">
+      Only the student's email can open the link. They verify by entering a one-time code Microsoft sends to that email (no Microsoft account needed). No passcode used.
+    </div>
 
     <button class="btn" id="generateBtn">Generate Links &amp; Open Email Draft</button>
 
@@ -346,31 +354,63 @@ async function generateAll(){
   if (!email) { setStatus("Enter the student email first.", "error"); return; }
   var daysVal = parseInt(el("expiryDays").value, 10);
   if (isNaN(daysVal) || daysVal < 1) { setStatus("Enter a valid number of days.", "error"); return; }
+  var restrict = el("restrictEmail").checked;
   setStatus("Creating " + addedRecordings.length + " share link(s)…", "info");
   try {
     var token = await getToken();
-    var passcode = makePasscode();
+    var passcode = restrict ? null : makePasscode();
     var expiry = new Date(Date.now() + daysVal * 86400000);
     var links = [];
     for (var i = 0; i < addedRecordings.length; i++) {
       var item = addedRecordings[i];
-      var resp = await fetch("https://graph.microsoft.com/v1.0/me/drive/items/" + item.file.id + "/createLink", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "view", scope: "anonymous", password: passcode, expirationDateTime: expiry.toISOString() })
-      });
-      if (!resp.ok) { var err = await resp.text(); throw new Error("createLink " + resp.status + " for " + item.file.name + ": " + err); }
-      var data = await resp.json();
-      links.push({ date: item.date, name: item.file.name, url: data.link.webUrl });
+      var url, resp, data;
+      if (restrict) {
+        // Use invite endpoint to restrict to recipient email
+        resp = await fetch("https://graph.microsoft.com/v1.0/me/drive/items/" + item.file.id + "/invite", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipients: [{ email: email }],
+            requireSignIn: true,
+            sendInvitation: false,
+            roles: ["read"],
+            expirationDateTime: expiry.toISOString()
+          })
+        });
+        if (!resp.ok) { var err = await resp.text(); throw new Error("invite " + resp.status + " for " + item.file.name + ": " + err); }
+        data = await resp.json();
+        // invite response: { value: [{ link: { webUrl }, ... }] }
+        if (!data.value || !data.value[0] || !data.value[0].link) {
+          throw new Error("invite response missing link for " + item.file.name);
+        }
+        url = data.value[0].link.webUrl;
+      } else {
+        // Anonymous link with passcode
+        resp = await fetch("https://graph.microsoft.com/v1.0/me/drive/items/" + item.file.id + "/createLink", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "view", scope: "anonymous", password: passcode, expirationDateTime: expiry.toISOString() })
+        });
+        if (!resp.ok) { var err = await resp.text(); throw new Error("createLink " + resp.status + " for " + item.file.name + ": " + err); }
+        data = await resp.json();
+        url = data.link.webUrl;
+      }
+      links.push({ date: item.date, name: item.file.name, url: url });
     }
-    lastResult = { links: links, passcode: passcode, email: email, expiry: expiry, days: daysVal };
+    lastResult = { links: links, passcode: passcode, email: email, expiry: expiry, days: daysVal, restricted: restrict };
     clearStatus();
     showResult();
   } catch(e){ setStatus("Error: " + e.message, "error"); }
 }
 
 function showResult(){
-  el("passcodeValue").textContent = lastResult.passcode;
+  var passBox = el("passcodeValue").parentElement;  // the .passcode-box div
+  if (lastResult.restricted) {
+    passBox.style.display = "none";
+  } else {
+    passBox.style.display = "";
+    el("passcodeValue").textContent = lastResult.passcode;
+  }
   var box = el("linkValue");
   box.innerHTML = "";
   lastResult.links.forEach(function(l){
@@ -400,7 +440,11 @@ function openEmail(){
     lines.push(l.url);
     lines.push("");
   });
-  lines.push("The passcode (same for all links above) will be sent separately via text.");
+  if (lastResult.restricted) {
+    lines.push("These links are restricted to your email address. When you click, Microsoft will ask you to verify by entering a one-time code sent to this email.");
+  } else {
+    lines.push("The passcode (same for all links above) will be sent separately via text.");
+  }
   lines.push("Links expire on " + lastResult.expiry.toLocaleString() + " (" + lastResult.days + " day" + (lastResult.days > 1 ? "s" : "") + " from now).");
   lines.push("");
   lines.push("— Apex RN Prep");
