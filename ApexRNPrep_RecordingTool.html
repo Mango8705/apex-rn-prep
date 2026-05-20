@@ -56,7 +56,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 <div class="app">
   <div class="panel" id="signinPanel">
     <h2>Recording Link Generator</h2>
-    <p class="version">v7 &mdash; May 2026</p>
+    <p class="version">v8 &mdash; May 2026</p>
     <hr>
     <p style="font-size:13px;color:#374151;margin-bottom:8px">Sign in with your Apex RN Prep account.</p>
     <button class="btn" id="signinBtn">Sign in with Microsoft</button>
@@ -66,7 +66,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 
   <div class="panel hidden" id="mainPanel">
     <h2>Generate Recording Link</h2>
-    <p class="version">v7 &mdash; May 2026</p>
+    <p class="version">v8 &mdash; May 2026</p>
     <div id="signedAs"></div>
     <hr>
 
@@ -78,19 +78,18 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 
     <div id="pickerContainer" class="hidden">
       <hr>
-      <label>Multiple recordings for that date &mdash; pick one:</label>
+      <label id="pickerLabel">Confirm recording to add:</label>
       <div id="fileList"></div>
       <div class="row">
-        <button class="btn btn-secondary" id="addPickedBtn">Add Selected</button>
+        <button class="btn btn-secondary" id="addPickedBtn">Add to List</button>
         <button class="btn btn-grey" id="cancelPickerBtn">Cancel</button>
       </div>
     </div>
 
-    <div id="addedContainer" class="hidden">
-      <hr>
-      <label>Recordings to send</label>
-      <div id="addedList"></div>
-    </div>
+    <hr>
+    <label>Recordings to send (review before generating)</label>
+    <div id="addedList" style="min-height:50px;border:1px dashed #d1d5db;border-radius:8px;padding:8px;background:#fafbfc"></div>
+    <div id="addedEmptyHint" style="font-size:11px;color:#9ca3af;text-align:center;padding:8px">No recordings added yet. Find one above.</div>
 
     <hr>
     <label>Student Email</label>
@@ -233,13 +232,9 @@ async function findRecording(){
       setStatus("No recordings created on " + dateStr + ". Folder has " + all.length + " files total.", "error");
       return;
     }
-    if (matches.length === 1) {
-      addRecording(dateStr, matches[0]);
-      return;
-    }
-    // Multiple — show picker
+    // Always show picker so user can review before adding
     pickerCandidates = matches;
-    pickerSelectedIdx = null;
+    pickerSelectedIdx = matches.length === 1 ? 0 : null;  // pre-select if only one
     renderPicker();
     el("pickerContainer").classList.remove("hidden");
     clearStatus();
@@ -247,6 +242,10 @@ async function findRecording(){
 }
 
 function renderPicker(){
+  var lbl = el("pickerLabel");
+  if (lbl) lbl.textContent = pickerCandidates.length === 1
+    ? "Confirm recording to add:"
+    : "Multiple recordings for that date — pick one:";
   var list = el("fileList");
   list.innerHTML = "";
   pickerCandidates.forEach(function(f, i){
@@ -280,7 +279,6 @@ function cancelPicker(){
 function addRecording(dateStr, file){
   addedRecordings.push({ date: dateStr, file: file });
   renderAdded();
-  el("addedContainer").classList.remove("hidden");
   setStatus("Added " + file.name + " (" + dateStr + ")", "success");
   // Bump date forward by a day for convenience
   var d = el("classDate"); var dt = new Date(d.value);
@@ -303,7 +301,8 @@ function renderAdded(){
     div.querySelector("button").onclick = function(){ removeAt(i); };
     list.appendChild(div);
   });
-  if (addedRecordings.length === 0) el("addedContainer").classList.add("hidden");
+  var hint = el("addedEmptyHint");
+  if (hint) hint.style.display = addedRecordings.length === 0 ? "block" : "none";
 }
 
 function removeAt(i){
@@ -395,7 +394,6 @@ function resetAll(){
   pickerCandidates = [];
   pickerSelectedIdx = null;
   lastResult = null;
-  el("addedContainer").classList.add("hidden");
   el("pickerContainer").classList.add("hidden");
   el("resultContainer").classList.add("hidden");
   el("studentEmail").value = "";
