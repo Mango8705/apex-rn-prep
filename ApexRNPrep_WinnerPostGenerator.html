@@ -28,7 +28,16 @@ input:focus,select:focus{border-color:#1a2d5a}
 #status.success{color:#16a34a;font-weight:700}
 .preview-panel{display:flex;flex-direction:column;align-items:center}
 .canvas-wrap{width:100%;max-width:370px;border-radius:12px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.22);margin-top:4px}
-#previewCanvas{width:100%;display:block}
+#previewCanvas{width:100%;display:block;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+#previewCanvas.dragging{cursor:grabbing}
+#previewCanvas.nophoto{cursor:default}
+.photo-controls{margin-top:10px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid #e5e7eb}
+.photo-controls.hidden-when-empty{display:none}
+.photo-controls label{font-size:11px;color:#6b7280;margin:0 0 6px 0;display:block;font-weight:600}
+.photo-controls .zoom-row{display:flex;align-items:center;gap:8px}
+.photo-controls input[type="range"]{flex:1;width:auto;padding:0;border:none;height:auto}
+.photo-controls .reset-btn{background:#6b7280;color:white;border:none;padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit}
+.photo-controls .reset-btn:hover{background:#4b5563}
 .preview-note{font-size:11px;color:#9ca3af;margin-top:8px;text-align:center}
 @media(max-width:680px){.app{grid-template-columns:1fr}}
 </style>
@@ -37,7 +46,7 @@ input:focus,select:focus{border-color:#1a2d5a}
 <div class="app">
   <div class="panel">
     <h2>Winner Post Generator</h2>
-    <p class="version">v61 &mdash; May 2026</p>
+    <p class="version">v62 &mdash; May 2026</p>
     <hr>
     <label>Background Color</label>
     <select id="bgColor" onchange="changeBg()">
@@ -79,7 +88,16 @@ input:focus,select:focus{border-color:#1a2d5a}
     <p class="version">739 &times; 892 px &nbsp;&middot;&nbsp; Instagram-ready PNG</p>
     <hr>
     <div class="canvas-wrap">
-      <canvas id="previewCanvas" width="700" height="874"></canvas>
+      <canvas id="previewCanvas" width="700" height="874" class="nophoto"></canvas>
+    </div>
+    <div class="photo-controls hidden-when-empty" id="photoControls">
+      <label>Photo position (drag photo in preview to move, slider to zoom)</label>
+      <div class="zoom-row">
+        <span style="font-size:11px;color:#6b7280">1×</span>
+        <input type="range" id="photoZoom" min="1" max="4" step="0.05" value="1">
+        <span style="font-size:11px;color:#6b7280">4×</span>
+        <button class="reset-btn" id="photoResetBtn" type="button">Reset</button>
+      </div>
     </div>
     <p class="preview-note">Preview updates as you type</p>
   </div>
@@ -100,16 +118,27 @@ const TMPL_PURPLE_B64="iVBORw0KGgoAAAANSUhEUgAAArwAAANqCAIAAADgyA+SAAEAAElEQVR4n
 const TMPL_MAP={navy:TMPL_B64, burgundy:TMPL_BURGUNDY_B64, green:TMPL_GREEN_B64, purple:TMPL_PURPLE_B64};
 const tmplImg=new Image();tmplImg.src='data:image/png;base64,'+TMPL_B64;
 let photoImg=null,renderTimer=null;
+let photoOffsetX=0,photoOffsetY=0,photoZoom=1.0;
+let _dragging=false,_dragStartCX=0,_dragStartCY=0,_dragStartOffX=0,_dragStartOffY=0;
 
 function onAch(){document.getElementById('qWrap').style.display=document.getElementById('achievement').value==='questions'?'block':'none';go();}
 function handlePhoto(e){
   const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=ev=>{const img=new Image();img.onload=()=>{photoImg=img;
+    photoOffsetX=0;photoOffsetY=0;photoZoom=1.0;
+    const zs=document.getElementById('photoZoom');if(zs)zs.value=1;
+    const pc=document.getElementById('photoControls');if(pc)pc.classList.remove('hidden-when-empty');
+    const cnv=document.getElementById('previewCanvas');if(cnv)cnv.classList.remove('nophoto');
     const th=document.getElementById('photoThumb');th.src=ev.target.result;th.style.display='block';
     document.getElementById('upIcon').style.display='none';
     document.getElementById('upLabel').textContent='Photo ready ✓';go();};
     img.src=ev.target.result;};reader.readAsDataURL(file);}
+function resetPhotoTransform(){
+  photoOffsetX=0;photoOffsetY=0;photoZoom=1.0;
+  const zs=document.getElementById('photoZoom');if(zs)zs.value=1;
+  go();
+}
 function go(){clearTimeout(renderTimer);renderTimer=setTimeout(render,80);}
 function changeBg(){
   const color=document.getElementById('bgColor').value;
@@ -146,8 +175,17 @@ async function render(){
   ctx.shadowBlur=0;ctx.shadowColor='transparent';
   ctx.beginPath();ctx.arc(CX,CY,CR,0,Math.PI*2);ctx.clip();
   if(photoImg){
-    const s=Math.max((CR*2)/photoImg.width,(CR*2)/photoImg.height);
-    ctx.drawImage(photoImg,CX-photoImg.width*s/2,CY-photoImg.height*s/2,photoImg.width*s,photoImg.height*s);
+    const baseS=Math.max((CR*2)/photoImg.width,(CR*2)/photoImg.height);
+    const s=baseS*photoZoom;
+    const w=photoImg.width*s, h=photoImg.height*s;
+    // Clamp so the photo always covers the circle (no exposed navy inside the ring)
+    const maxOffX=Math.max(0,(w-CR*2)/2);
+    const maxOffY=Math.max(0,(h-CR*2)/2);
+    if(photoOffsetX>maxOffX)photoOffsetX=maxOffX;
+    if(photoOffsetX<-maxOffX)photoOffsetX=-maxOffX;
+    if(photoOffsetY>maxOffY)photoOffsetY=maxOffY;
+    if(photoOffsetY<-maxOffY)photoOffsetY=-maxOffY;
+    ctx.drawImage(photoImg,CX-w/2+photoOffsetX,CY-h/2+photoOffsetY,w,h);
   }else{
     ctx.fillStyle='#182080';ctx.fillRect(CX-CR,CY-CR,CR*2,CR*2);
     ctx.fillStyle='rgba(255,255,255,0.25)';ctx.font='14px sans-serif';
@@ -193,6 +231,47 @@ function dlPost(){
   const s=document.getElementById('status');
   s.className='success';s.textContent='✓ Downloaded! Ready for Instagram.';
   setTimeout(()=>{s.textContent='';s.className='';},3500);}
+// --- Photo drag + zoom wiring ---
+(function(){
+  const cnv=document.getElementById('previewCanvas');
+  function getCanvasPos(e){
+    const r=cnv.getBoundingClientRect();
+    const sx=cnv.width/r.width, sy=cnv.height/r.height;
+    return { x:(e.clientX-r.left)*sx, y:(e.clientY-r.top)*sy };
+  }
+  cnv.addEventListener('pointerdown',function(e){
+    if(!photoImg)return;
+    const p=getCanvasPos(e);
+    const dx=p.x-CX, dy=p.y-CY;
+    if(dx*dx+dy*dy>CR*CR)return;  // outside photo circle
+    _dragging=true;
+    _dragStartCX=p.x; _dragStartCY=p.y;
+    _dragStartOffX=photoOffsetX; _dragStartOffY=photoOffsetY;
+    cnv.setPointerCapture(e.pointerId);
+    cnv.classList.add('dragging');
+    e.preventDefault();
+  });
+  cnv.addEventListener('pointermove',function(e){
+    if(!_dragging)return;
+    const p=getCanvasPos(e);
+    photoOffsetX=_dragStartOffX+(p.x-_dragStartCX);
+    photoOffsetY=_dragStartOffY+(p.y-_dragStartCY);
+    go();
+  });
+  function endDrag(e){
+    if(!_dragging)return;
+    _dragging=false;
+    cnv.classList.remove('dragging');
+    try{cnv.releasePointerCapture(e.pointerId);}catch(_){};
+  }
+  cnv.addEventListener('pointerup',endDrag);
+  cnv.addEventListener('pointercancel',endDrag);
+  cnv.addEventListener('pointerleave',function(e){if(_dragging)endDrag(e);});
+  const zs=document.getElementById('photoZoom');
+  if(zs)zs.addEventListener('input',function(){photoZoom=parseFloat(this.value)||1;go();});
+  const rb=document.getElementById('photoResetBtn');
+  if(rb)rb.addEventListener('click',resetPhotoTransform);
+})();
 go();
 </script>
 </body>
