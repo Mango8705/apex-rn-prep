@@ -46,7 +46,7 @@ input:focus,select:focus{border-color:#1a2d5a}
 <div class="app">
   <div class="panel">
     <h2>Winner Post Generator</h2>
-    <p class="version">v62 &mdash; May 2026</p>
+    <p class="version">v63 &mdash; May 2026</p>
     <hr>
     <label>Background Color</label>
     <select id="bgColor" onchange="changeBg()">
@@ -231,42 +231,61 @@ function dlPost(){
   const s=document.getElementById('status');
   s.className='success';s.textContent='✓ Downloaded! Ready for Instagram.';
   setTimeout(()=>{s.textContent='';s.className='';},3500);}
-// --- Photo drag + zoom wiring ---
+// --- Photo drag + zoom wiring (mouse + touch, document-level move/up) ---
 (function(){
   const cnv=document.getElementById('previewCanvas');
-  function getCanvasPos(e){
+  function getCanvasPos(clientX, clientY){
     const r=cnv.getBoundingClientRect();
     const sx=cnv.width/r.width, sy=cnv.height/r.height;
-    return { x:(e.clientX-r.left)*sx, y:(e.clientY-r.top)*sy };
+    return { x:(clientX-r.left)*sx, y:(clientY-r.top)*sy };
   }
-  cnv.addEventListener('pointerdown',function(e){
-    if(!photoImg)return;
-    const p=getCanvasPos(e);
+  function startDrag(clientX, clientY){
+    if(!photoImg) return false;
+    const p=getCanvasPos(clientX, clientY);
     const dx=p.x-CX, dy=p.y-CY;
-    if(dx*dx+dy*dy>CR*CR)return;  // outside photo circle
+    if(dx*dx+dy*dy>CR*CR) return false;  // outside photo circle
     _dragging=true;
     _dragStartCX=p.x; _dragStartCY=p.y;
     _dragStartOffX=photoOffsetX; _dragStartOffY=photoOffsetY;
-    cnv.setPointerCapture(e.pointerId);
     cnv.classList.add('dragging');
-    e.preventDefault();
-  });
-  cnv.addEventListener('pointermove',function(e){
-    if(!_dragging)return;
-    const p=getCanvasPos(e);
+    return true;
+  }
+  function moveDrag(clientX, clientY){
+    if(!_dragging) return;
+    const p=getCanvasPos(clientX, clientY);
     photoOffsetX=_dragStartOffX+(p.x-_dragStartCX);
     photoOffsetY=_dragStartOffY+(p.y-_dragStartCY);
     go();
-  });
-  function endDrag(e){
-    if(!_dragging)return;
+  }
+  function endDrag(){
+    if(!_dragging) return;
     _dragging=false;
     cnv.classList.remove('dragging');
-    try{cnv.releasePointerCapture(e.pointerId);}catch(_){};
   }
-  cnv.addEventListener('pointerup',endDrag);
-  cnv.addEventListener('pointercancel',endDrag);
-  cnv.addEventListener('pointerleave',function(e){if(_dragging)endDrag(e);});
+  // Mouse events
+  cnv.addEventListener('mousedown',function(e){
+    if(startDrag(e.clientX, e.clientY)) e.preventDefault();
+  });
+  document.addEventListener('mousemove',function(e){
+    if(_dragging){ moveDrag(e.clientX, e.clientY); e.preventDefault(); }
+  });
+  document.addEventListener('mouseup',function(e){ endDrag(); });
+  // Touch events
+  cnv.addEventListener('touchstart',function(e){
+    if(e.touches.length===0) return;
+    const t=e.touches[0];
+    if(startDrag(t.clientX, t.clientY)) e.preventDefault();
+  },{passive:false});
+  document.addEventListener('touchmove',function(e){
+    if(_dragging && e.touches.length>0){
+      const t=e.touches[0];
+      moveDrag(t.clientX, t.clientY);
+      e.preventDefault();
+    }
+  },{passive:false});
+  document.addEventListener('touchend',function(e){ endDrag(); });
+  document.addEventListener('touchcancel',function(e){ endDrag(); });
+  // Zoom slider + reset
   const zs=document.getElementById('photoZoom');
   if(zs)zs.addEventListener('input',function(){photoZoom=parseFloat(this.value)||1;go();});
   const rb=document.getElementById('photoResetBtn');
