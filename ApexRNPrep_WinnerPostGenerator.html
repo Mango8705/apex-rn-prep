@@ -46,7 +46,7 @@ input:focus,select:focus{border-color:#1a2d5a}
 <div class="app">
   <div class="panel">
     <h2>Winner Post Generator</h2>
-    <p class="version">v63 &mdash; May 2026</p>
+    <p class="version">v64 &mdash; May 2026</p>
     <hr>
     <label>Background Color</label>
     <select id="bgColor" onchange="changeBg()">
@@ -120,6 +120,15 @@ const tmplImg=new Image();tmplImg.src='data:image/png;base64,'+TMPL_B64;
 let photoImg=null,renderTimer=null;
 let photoOffsetX=0,photoOffsetY=0,photoZoom=1.0;
 let _dragging=false,_dragStartCX=0,_dragStartCY=0,_dragStartOffX=0,_dragStartOffY=0;
+let _rafScheduled=false;
+function scheduleRender(){
+  if(_rafScheduled)return;
+  _rafScheduled=true;
+  requestAnimationFrame(function(){
+    _rafScheduled=false;
+    render();
+  });
+}
 
 function onAch(){document.getElementById('qWrap').style.display=document.getElementById('achievement').value==='questions'?'block':'none';go();}
 function handlePhoto(e){
@@ -255,7 +264,7 @@ function dlPost(){
     const p=getCanvasPos(clientX, clientY);
     photoOffsetX=_dragStartOffX+(p.x-_dragStartCX);
     photoOffsetY=_dragStartOffY+(p.y-_dragStartCY);
-    go();
+    scheduleRender();
   }
   function endDrag(){
     if(!_dragging) return;
@@ -287,7 +296,7 @@ function dlPost(){
   document.addEventListener('touchcancel',function(e){ endDrag(); });
   // Zoom slider + reset
   const zs=document.getElementById('photoZoom');
-  if(zs)zs.addEventListener('input',function(){photoZoom=parseFloat(this.value)||1;go();});
+  if(zs)zs.addEventListener('input',function(){photoZoom=parseFloat(this.value)||1;scheduleRender();});
   const rb=document.getElementById('photoResetBtn');
   if(rb)rb.addEventListener('click',resetPhotoTransform);
 })();
