@@ -14,7 +14,7 @@ body{font-family:'Segoe UI',sans-serif;background:#eef2f7;min-height:100vh;paddi
 .version{font-size:11px;color:#9ca3af;margin-top:3px}
 hr{border:none;border-top:1px solid #e5e7eb;margin:14px 0}
 label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;margin-top:13px}
-input,select{width:100%;padding:10px 12px;font-size:14px;border:1px solid #d1d5db;border-radius:8px;font-family:inherit}
+input:not([type="radio"]):not([type="checkbox"]),select{width:100%;padding:10px 12px;font-size:14px;border:1px solid #d1d5db;border-radius:8px;font-family:inherit}
 input:focus,select:focus{border-color:#1a2d5a;outline:none}
 .btn{width:100%;padding:12px;background:#1a2d5a;color:white;font-size:14px;font-weight:700;border:none;border-radius:10px;cursor:pointer;margin-top:16px;font-family:inherit}
 .btn:hover{background:#243e7a}
@@ -29,7 +29,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 #signedAs strong{color:#1a2d5a}
 .file-option{display:flex;padding:10px;border:1px solid #d1d5db;border-radius:8px;margin-bottom:8px;cursor:pointer}
 .file-option.selected{border-color:#1a2d5a;background:#eff6ff}
-.file-option input{margin-right:10px;margin-top:3px}
+.file-option input[type="radio"]{width:auto;margin-right:10px;margin-top:3px;flex-shrink:0}
 .file-info{flex:1}
 .file-name{font-size:13px;font-weight:600;color:#1a2d5a;word-break:break-word}
 .file-meta{font-size:11px;color:#6b7280;margin-top:3px}
@@ -45,7 +45,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 <div class="app">
   <div class="panel" id="signinPanel">
     <h2>Recording Link Generator</h2>
-    <p class="version">v4 &mdash; May 2026</p>
+    <p class="version">v5 &mdash; May 2026</p>
     <hr>
     <p style="font-size:13px;color:#374151;margin-bottom:8px">Sign in with your Apex RN Prep account.</p>
     <button class="btn" id="signinBtn">Sign in with Microsoft</button>
@@ -55,7 +55,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 
   <div class="panel hidden" id="mainPanel">
     <h2>Generate Recording Link</h2>
-    <p class="version">v4 &mdash; May 2026</p>
+    <p class="version">v5 &mdash; May 2026</p>
     <div id="signedAs"></div>
     <hr>
     <label>Class Date</label>
