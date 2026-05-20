@@ -46,7 +46,7 @@ input:focus,select:focus{border-color:#1a2d5a}
 <div class="app">
   <div class="panel">
     <h2>Winner Post Generator</h2>
-    <p class="version">v65 &mdash; May 2026</p>
+    <p class="version">v66 &mdash; May 2026</p>
     <hr>
     <label>Background Color</label>
     <select id="bgColor" onchange="changeBg()">
@@ -184,9 +184,12 @@ async function render(){
   ctx.shadowBlur=0;ctx.shadowColor='transparent';
   ctx.beginPath();ctx.arc(CX,CY,CR,0,Math.PI*2);ctx.clip();
   if(photoImg){
-    // baseS = exact cover-fit; OVERSCAN gives slight margin so drag works at 1x zoom too
-    const OVERSCAN=1.12;
-    const baseS=Math.max((CR*2)/photoImg.width,(CR*2)/photoImg.height)*OVERSCAN;
+    // Use natural pixel size when photo is bigger than the circle (so drag has range).
+    // Only scale UP when photo is too small to cover the circle.
+    // OVERSCAN ensures the smaller dimension ends up at least 1.15x the circle diameter.
+    const OVERSCAN=1.15;
+    const coverScale=Math.max((CR*2)/photoImg.width,(CR*2)/photoImg.height);
+    const baseS=Math.max(1, coverScale*OVERSCAN);
     const s=baseS*photoZoom;
     const w=photoImg.width*s, h=photoImg.height*s;
     // Clamp so the photo always covers the circle (no exposed navy inside the ring)
