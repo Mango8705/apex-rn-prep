@@ -45,7 +45,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 <div class="app">
   <div class="panel" id="signinPanel">
     <h2>Recording Link Generator</h2>
-    <p class="version">v3 &mdash; May 2026</p>
+    <p class="version">v4 &mdash; May 2026</p>
     <hr>
     <p style="font-size:13px;color:#374151;margin-bottom:8px">Sign in with your Apex RN Prep account.</p>
     <button class="btn" id="signinBtn">Sign in with Microsoft</button>
@@ -55,7 +55,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 
   <div class="panel hidden" id="mainPanel">
     <h2>Generate Recording Link</h2>
-    <p class="version">v3 &mdash; May 2026</p>
+    <p class="version">v4 &mdash; May 2026</p>
     <div id="signedAs"></div>
     <hr>
     <label>Class Date</label>
@@ -184,7 +184,7 @@ async function findRecordings(){
   try {
     var token = await getToken();
     var url = "https://graph.microsoft.com/v1.0/me/drive/root:/" + encodeURIComponent(RECORDINGS_FOLDER) +
-      ":/children?$top=200&$select=id,name,createdDateTime,lastModifiedDateTime,size,file,folder,webUrl&$orderby=createdDateTime%20desc";
+      ":/children?$top=200";
     var resp = await fetch(url, { headers: { Authorization: "Bearer " + token } });
     if (!resp.ok) { var err = await resp.text(); throw new Error("Graph " + resp.status + ": " + err); }
     var data = await resp.json();
