@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Apex RN Prep — Recording Link Generator</title>
-<script src="https://alcdn.msauth.net/browser/3.7.0/js/msal-browser.min.js"></script>
+<script src="https://alcdn.msftauth.net/browser/3.7.0/js/msal-browser.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',sans-serif;background:#eef2f7;min-height:100vh;padding:28px 20px;display:flex;align-items:flex-start;justify-content:center}
@@ -50,7 +50,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
   <!-- Sign-in panel -->
   <div class="panel" id="signinPanel">
     <h2>Recording Link Generator</h2>
-    <p class="version">v1 &mdash; May 2026</p>
+    <p class="version">v2 &mdash; May 2026</p>
     <hr>
     <p style="font-size:13px;color:#374151;margin-bottom:8px">Sign in with your Apex RN Prep account to access recordings.</p>
     <button class="btn" onclick="signIn()">Sign in with Microsoft</button>
@@ -60,7 +60,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
   <!-- Main tool panel (hidden until signed in) -->
   <div class="panel hidden" id="mainPanel">
     <h2>Generate Recording Link</h2>
-    <p class="version">v1 &mdash; May 2026</p>
+    <p class="version">v2 &mdash; May 2026</p>
     <div id="signedAs"></div>
     <hr>
 
@@ -120,19 +120,39 @@ let candidateFiles = [];
 let selectedFile = null;
 let lastResult = null;
 
+async function loadMsalFallback(){
+  return new Promise((res, rej)=>{
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/@azure/msal-browser@3/lib/msal-browser.min.js';
+    s.onload = res;
+    s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
 window.addEventListener('load', async ()=>{
-  msalInstance = new msal.PublicClientApplication(msalConfig);
-  await msalInstance.initialize();
-  // Try to handle a redirect, then check existing accounts
-  await msalInstance.handleRedirectPromise().catch(e=>{});
-  const accounts = msalInstance.getAllAccounts();
-  if (accounts.length > 0) {
-    currentAccount = accounts[0];
-    showMainPanel();
+  try {
+    if (typeof msal === 'undefined') {
+      console.warn('MSAL not loaded from primary CDN, trying fallback…');
+      await loadMsalFallback();
+    }
+    if (typeof msal === 'undefined') {
+      alert('Failed to load Microsoft sign-in library. Check your internet connection and reload.');
+      return;
+    }
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+    await msalInstance.initialize();
+    await msalInstance.handleRedirectPromise().catch(e=>{});
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      currentAccount = accounts[0];
+      showMainPanel();
+    }
+    document.getElementById('classDate').valueAsDate = new Date();
+  } catch (e) {
+    console.error('Init error:', e);
+    alert('Initialization failed: ' + e.message);
   }
-  // Default date to today
-  const today = new Date();
-  document.getElementById('classDate').valueAsDate = today;
 });
 
 async function signIn(){
@@ -325,25 +345,4 @@ ${shareUrl}
 The passcode will be sent separately via text. The link expires on ${expiry.toLocaleString()}.
 
 — Apex RN Prep`;
-  const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.location.href = mailto;
-}
-
-function copyPasscode(){
-  navigator.clipboard.writeText(lastResult.passcode).then(()=>{
-    setStatus('Passcode copied to clipboard. Text it to the student.', 'success');
-  });
-}
-
-function resetForm(){
-  document.getElementById('filesContainer').classList.add('hidden');
-  document.getElementById('resultContainer').classList.add('hidden');
-  document.getElementById('studentEmail').value = '';
-  selectedFile = null;
-  candidateFiles = [];
-  lastResult = null;
-  clearStatus();
-}
-</script>
-</body>
-</html>
+  const mailto = `mailto:${encodeURIComponent(email)}
