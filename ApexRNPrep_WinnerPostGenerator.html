@@ -37,7 +37,7 @@ input:focus,select:focus{border-color:#1a2d5a}
 <div class="app">
   <div class="panel">
     <h2>Winner Post Generator</h2>
-    <p class="version">v37 &mdash; May 2026</p>
+    <p class="version">v38 &mdash; May 2026 (= v33 restored)</p>
     <hr>
     <label>Student Photo</label>
     <div class="upload-area">
@@ -124,43 +124,7 @@ async function render(){
   ctx.drawImage(tmplImg,0,0,CW,CH);
   ctx.restore();
 
-  // 1b: Erase the template's painted band area, then draw a CLEAN simple banner from scratch
-  ctx.save();
-  ctx.shadowBlur=0;ctx.shadowColor='transparent';
-  ctx.fillStyle='#172950';
-  ctx.fillRect(120,632,460,86);
-  const bandX0=180, bandX1=520, bandTop=650, bandBot=708;
-  const wingW=44, wingTop=640, wingBot=718, notchDepth=18;
-  ctx.fillStyle='#E6B91A';
-  ctx.beginPath();
-  ctx.moveTo(bandX0, wingTop);
-  ctx.lineTo(bandX0-wingW, wingTop);
-  ctx.lineTo(bandX0-wingW+notchDepth, (wingTop+wingBot)/2);
-  ctx.lineTo(bandX0-wingW, wingBot);
-  ctx.lineTo(bandX0, wingBot);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(bandX1, wingTop);
-  ctx.lineTo(bandX1+wingW, wingTop);
-  ctx.lineTo(bandX1+wingW-notchDepth, (wingTop+wingBot)/2);
-  ctx.lineTo(bandX1+wingW, wingBot);
-  ctx.lineTo(bandX1, wingBot);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle='rgba(150,100,0,0.35)';
-  ctx.fillRect(bandX0-wingW, wingTop, wingW, 3);
-  ctx.fillRect(bandX1, wingTop, wingW, 3);
-  ctx.fillStyle='#F2C920';
-  ctx.fillRect(bandX0, bandTop, bandX1-bandX0, bandBot-bandTop);
-  ctx.fillStyle='rgba(255,230,120,0.5)';
-  ctx.fillRect(bandX0, bandTop, bandX1-bandX0, 2);
-  ctx.fillStyle='rgba(80,55,0,0.4)';
-  ctx.fillRect(bandX0, bandBot-2, bandX1-bandX0, 2);
-  ctx.fillStyle='rgba(100,70,0,0.3)';
-  ctx.fillRect(bandX0, bandTop, 2, bandBot-bandTop);
-  ctx.fillRect(bandX1-2, bandTop, 2, bandBot-bandTop);
-  ctx.restore();
+  // 1b/1c: Ribbon is now baked into the template (v15) — no canvas redraw needed.
 
   // 2. Photo — isolated save/restore, no shadow
   ctx.save();
@@ -187,9 +151,9 @@ async function render(){
   ctx.strokeStyle='rgba(60,40,0,0.55)';
   ctx.lineWidth=2;
   ctx.lineJoin='round';
-  ctx.strokeText(name,CX,679);
+  ctx.strokeText(name,CX,672);
   ctx.fillStyle='white';
-  ctx.fillText(name,CX,679);
+  ctx.fillText(name,CX,672);
   ctx.restore();
 
   // 4. Tagline — skip if empty (user selected "No tagline")
