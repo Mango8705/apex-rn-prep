@@ -37,7 +37,7 @@ input:focus,select:focus{border-color:#1a2d5a}
 <div class="app">
   <div class="panel">
     <h2>Winner Post Generator</h2>
-    <p class="version">v36 &mdash; May 2026 (= v33 restored)</p>
+    <p class="version">v37 &mdash; May 2026</p>
     <hr>
     <label>Student Photo</label>
     <div class="upload-area">
@@ -124,7 +124,53 @@ async function render(){
   ctx.drawImage(tmplImg,0,0,CW,CH);
   ctx.restore();
 
-  // 1b/1c: Ribbon is now baked into the template (v15) — no canvas redraw needed.
+  // 1b: Erase the template's painted band area, then draw a CLEAN simple banner from scratch
+  ctx.save();
+  ctx.shadowBlur=0;ctx.shadowColor='transparent';
+  // Erase to navy — covers the baked-in band area
+  ctx.fillStyle='#172950';
+  ctx.fillRect(120,632,460,86);
+  // Banner geometry (matches the simple notched-ribbon style)
+  const bandX0=180, bandX1=520, bandTop=650, bandBot=708;
+  const wingW=44; // wing extends this far outside the band on each side
+  const wingTop=640, wingBot=718; // wings slightly taller than band
+  const notchDepth=18; // how deep the V-notch cuts into the wing
+  // Left wing — notched rectangle
+  ctx.fillStyle='#E6B91A';
+  ctx.beginPath();
+  ctx.moveTo(bandX0, wingTop);
+  ctx.lineTo(bandX0-wingW, wingTop);
+  ctx.lineTo(bandX0-wingW+notchDepth, (wingTop+wingBot)/2);
+  ctx.lineTo(bandX0-wingW, wingBot);
+  ctx.lineTo(bandX0, wingBot);
+  ctx.closePath();
+  ctx.fill();
+  // Right wing (mirror)
+  ctx.beginPath();
+  ctx.moveTo(bandX1, wingTop);
+  ctx.lineTo(bandX1+wingW, wingTop);
+  ctx.lineTo(bandX1+wingW-notchDepth, (wingTop+wingBot)/2);
+  ctx.lineTo(bandX1+wingW, wingBot);
+  ctx.lineTo(bandX1, wingBot);
+  ctx.closePath();
+  ctx.fill();
+  // Subtle darker shadow at top of wings (where they would fold under the band)
+  ctx.fillStyle='rgba(150,100,0,0.35)';
+  ctx.fillRect(bandX0-wingW, wingTop, wingW, 3);
+  ctx.fillRect(bandX1, wingTop, wingW, 3);
+  // Center band
+  ctx.fillStyle='#F2C920';
+  ctx.fillRect(bandX0, bandTop, bandX1-bandX0, bandBot-bandTop);
+  // Band edges — bright top, darker bottom (subtle 3D)
+  ctx.fillStyle='rgba(255,230,120,0.5)';
+  ctx.fillRect(bandX0, bandTop, bandX1-bandX0, 2);
+  ctx.fillStyle='rgba(80,55,0,0.4)';
+  ctx.fillRect(bandX0, bandBot-2, bandX1-bandX0, 2);
+  // Inner fold shadow where the wings meet the band (subtle vertical dark line)
+  ctx.fillStyle='rgba(100,70,0,0.3)';
+  ctx.fillRect(bandX0, bandTop, 2, bandBot-bandTop);
+  ctx.fillRect(bandX1-2, bandTop, 2, bandBot-bandTop);
+  ctx.restore();
 
   // 2. Photo — isolated save/restore, no shadow
   ctx.save();
@@ -135,50 +181,4 @@ async function render(){
     ctx.drawImage(photoImg,CX-photoImg.width*s/2,CY-photoImg.height*s/2,photoImg.width*s,photoImg.height*s);
   }else{
     ctx.fillStyle='#182080';ctx.fillRect(CX-CR,CY-CR,CR*2,CR*2);
-    ctx.fillStyle='rgba(255,255,255,0.25)';ctx.font='14px sans-serif';
-    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('Upload photo above',CX,CY);
-  }
-  ctx.restore();
-
-  // 3. Name on ribbon — clean white over the baked-in gold band, thin outline for legibility
-  // Band is at y=644-700 in the v15 template, center y=672. Name x-center is at CX.
-  ctx.save();
-  ctx.shadowBlur=0;ctx.shadowColor='transparent';ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;
-  let fs=40;
-  ctx.font='700 '+fs+'px Montserrat,"Arial Black",sans-serif';
-  while(ctx.measureText(name).width>300&&fs>16){fs-=2;ctx.font='700 '+fs+'px Montserrat,"Arial Black",sans-serif';}
-  ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.strokeStyle='rgba(60,40,0,0.55)';
-  ctx.lineWidth=2;
-  ctx.lineJoin='round';
-  ctx.strokeText(name,CX,672);
-  ctx.fillStyle='white';
-  ctx.fillText(name,CX,672);
-  ctx.restore();
-
-  // 4. Tagline — skip if empty (user selected "No tagline")
-  if(tag){
-    ctx.save();
-    ctx.shadowBlur=0;ctx.shadowColor='transparent';ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;
-    ctx.font='italic 400 22px Lora,Georgia,serif';
-    ctx.fillStyle='white';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.shadowColor='rgba(10,20,60,0.8)';
-    ctx.shadowBlur=2;ctx.shadowOffsetX=0;ctx.shadowOffsetY=1;
-    ctx.fillText(tag,CX,762);
-    ctx.restore();
-  }
-}
-
-function dlPost(){
-  const canvas=document.getElementById('previewCanvas');
-  const name=(document.getElementById('studentName').value.trim()||'winner').replace(/[^a-zA-Z0-9]/g,'_');
-  const a=document.createElement('a');a.download='WinnerPost_'+name+'.png';
-  a.href=canvas.toDataURL('image/png');a.click();
-  const s=document.getElementById('status');
-  s.className='success';s.textContent='✓ Downloaded! Ready for Instagram.';
-  setTimeout(()=>{s.textContent='';s.className='';},3500);}
-go();
-</script>
-</body>
-</html>
+    ctx.fill
