@@ -26,7 +26,7 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 #status{font-size:13px;margin-top:10px;padding:10px;border-radius:6px;display:none}
 #status.info{background:#eff6ff;color:#1e40af;display:block}
 #status.success{background:#ecfdf5;color:#065f46;display:block}
-#status.error{background:#fef2f2;color:#991b1b;display:block}
+#status.error{background:#fef2f2;color:#991b1b;display:block;white-space:pre-wrap}
 #signedAs{font-size:12px;color:#6b7280;margin-bottom:10px}
 #signedAs strong{color:#1a2d5a}
 .file-option{display:flex;align-items:flex-start;padding:10px;border:1px solid #d1d5db;border-radius:8px;margin-bottom:8px;cursor:pointer}
@@ -47,37 +47,33 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
 </head>
 <body>
 <div class="app">
-  <!-- Sign-in panel -->
   <div class="panel" id="signinPanel">
     <h2>Recording Link Generator</h2>
-    <p class="version">v2 &mdash; May 2026</p>
+    <p class="version">v3 &mdash; May 2026</p>
     <hr>
     <p style="font-size:13px;color:#374151;margin-bottom:8px">Sign in with your Apex RN Prep account to access recordings.</p>
-    <button class="btn" onclick="signIn()">Sign in with Microsoft</button>
+    <button class="btn" id="signinBtn">Sign in with Microsoft</button>
+    <div id="loadStatus" style="font-size:11px;color:#6b7280;text-align:center;margin-top:8px">Initializing…</div>
     <a class="back-link" href="ApexRNPrep_Hub.html">&larr; Back to Hub</a>
   </div>
 
-  <!-- Main tool panel (hidden until signed in) -->
   <div class="panel hidden" id="mainPanel">
     <h2>Generate Recording Link</h2>
-    <p class="version">v2 &mdash; May 2026</p>
+    <p class="version">v3 &mdash; May 2026</p>
     <div id="signedAs"></div>
     <hr>
-
     <label>Class Date</label>
     <input type="date" id="classDate">
-
     <label>Student Email</label>
     <input type="email" id="studentEmail" placeholder="student@example.com">
-
-    <button class="btn" onclick="findRecordings()" id="findBtn">Find Recording</button>
+    <button class="btn" id="findBtn">Find Recording</button>
     <div id="status"></div>
 
     <div id="filesContainer" class="hidden">
       <hr>
-      <label>Select recording (multiple found for that date)</label>
+      <label>Select recording</label>
       <div id="fileList"></div>
-      <button class="btn btn-secondary" onclick="generateLinkAndEmail()" id="generateBtn">Generate Link &amp; Open Email Draft</button>
+      <button class="btn btn-secondary" id="generateBtn">Generate Link &amp; Open Email Draft</button>
     </div>
 
     <div id="resultContainer" class="hidden">
@@ -85,11 +81,11 @@ input:focus,select:focus{border-color:#1a2d5a;outline:none}
       <div class="passcode-box">
         <div class="passcode-label">Text this passcode to the student</div>
         <div class="passcode-value" id="passcodeValue">------</div>
-        <button class="copy-btn" onclick="copyPasscode()">Copy passcode</button>
+        <button class="copy-btn" id="copyBtn">Copy passcode</button>
       </div>
       <div class="link-box" id="linkValue"></div>
-      <button class="btn" onclick="openEmailDraft()" style="margin-top:10px">Open Email Draft</button>
-      <button class="btn" onclick="resetForm()" style="background:#6b7280;margin-top:8px">Generate Another</button>
+      <button class="btn" id="emailBtn" style="margin-top:10px">Open Email Draft</button>
+      <button class="btn" id="resetBtn" style="background:#6b7280;margin-top:8px">Generate Another</button>
     </div>
 
     <a class="back-link" href="ApexRNPrep_Hub.html">&larr; Back to Hub</a>
@@ -101,169 +97,194 @@ const CONFIG = {
   clientId: "5bd0113e-5f89-4b38-a79c-90bdd9820835",
   tenantId: "9a563a66-0f9f-420d-b287-41c2466f2fab",
   redirectUri: "https://mango8705.github.io/apex-rn-prep/ApexRNPrep_RecordingTool.html",
-  recordingsFolder: "Recordings",  // path in /me/drive/root
+  recordingsFolder: "Recordings",
   linkExpiryDays: 3,
+  scopes: ["Files.ReadWrite.All", "User.Read"]
 };
 
-const msalConfig = {
-  auth: {
-    clientId: CONFIG.clientId,
-    authority: `https://login.microsoftonline.com/${CONFIG.tenantId}`,
-    redirectUri: CONFIG.redirectUri,
-  },
-  cache: { cacheLocation: "sessionStorage" },
-};
-const loginRequest = { scopes: ["Files.ReadWrite.All", "User.Read"] };
-let msalInstance = null;
-let currentAccount = null;
-let candidateFiles = [];
-let selectedFile = null;
-let lastResult = null;
+var msalInstance = null;
+var currentAccount = null;
+var candidateFiles = [];
+var selectedFile = null;
+var lastResult = null;
 
-async function loadMsalFallback(){
-  return new Promise((res, rej)=>{
-    const s = document.createElement('script');
-    s.src = 'https://unpkg.com/@azure/msal-browser@3/lib/msal-browser.min.js';
-    s.onload = res;
-    s.onerror = rej;
-    document.head.appendChild(s);
-  });
+function $(id){ return document.getElementById(id); }
+
+function setLoadStatus(msg){
+  var el = $("loadStatus");
+  if (el) el.textContent = msg;
 }
 
-window.addEventListener('load', async ()=>{
-  try {
-    if (typeof msal === 'undefined') {
-      console.warn('MSAL not loaded from primary CDN, trying fallback…');
-      await loadMsalFallback();
-    }
-    if (typeof msal === 'undefined') {
-      alert('Failed to load Microsoft sign-in library. Check your internet connection and reload.');
-      return;
-    }
-    msalInstance = new msal.PublicClientApplication(msalConfig);
-    await msalInstance.initialize();
-    await msalInstance.handleRedirectPromise().catch(e=>{});
-    const accounts = msalInstance.getAllAccounts();
-    if (accounts.length > 0) {
-      currentAccount = accounts[0];
-      showMainPanel();
-    }
-    document.getElementById('classDate').valueAsDate = new Date();
-  } catch (e) {
-    console.error('Init error:', e);
-    alert('Initialization failed: ' + e.message);
-  }
-});
-
-async function signIn(){
-  try {
-    const result = await msalInstance.loginPopup(loginRequest);
-    currentAccount = result.account;
-    showMainPanel();
-  } catch (e) {
-    setStatus('Sign-in failed: ' + e.message, 'error');
-  }
-}
-
-function showMainPanel(){
-  document.getElementById('signinPanel').classList.add('hidden');
-  document.getElementById('mainPanel').classList.remove('hidden');
-  document.getElementById('signedAs').innerHTML = `Signed in as <strong>${currentAccount.username}</strong>`;
-}
-
-async function getToken(){
-  try {
-    const resp = await msalInstance.acquireTokenSilent({
-      scopes: loginRequest.scopes,
-      account: currentAccount,
-    });
-    return resp.accessToken;
-  } catch (e) {
-    const resp = await msalInstance.acquireTokenPopup(loginRequest);
-    return resp.accessToken;
-  }
-}
-
-function setStatus(msg, type='info'){
-  const el = document.getElementById('status');
-  el.className = type;
+function setStatus(msg, type){
+  var el = $("status");
+  el.className = type || "info";
   el.textContent = msg;
 }
 
 function clearStatus(){
-  document.getElementById('status').className = '';
-  document.getElementById('status').textContent = '';
+  var el = $("status");
+  el.className = "";
+  el.textContent = "";
+}
+
+function loadFallbackMsal(){
+  return new Promise(function(resolve, reject){
+    var s = document.createElement("script");
+    s.src = "https://unpkg.com/@azure/msal-browser@3/lib/msal-browser.min.js";
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function init(){
+  try {
+    setLoadStatus("Loading sign-in library…");
+    if (typeof msal === "undefined") {
+      try {
+        await loadFallbackMsal();
+      } catch (e) {
+        setLoadStatus("Failed to load Microsoft library. Check your internet connection.");
+        return;
+      }
+    }
+    if (typeof msal === "undefined") {
+      setLoadStatus("Microsoft library still not available after fallback. Check connection.");
+      return;
+    }
+    msalInstance = new msal.PublicClientApplication({
+      auth: {
+        clientId: CONFIG.clientId,
+        authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
+        redirectUri: CONFIG.redirectUri
+      },
+      cache: { cacheLocation: "sessionStorage" }
+    });
+    await msalInstance.initialize();
+    try { await msalInstance.handleRedirectPromise(); } catch(e) {}
+    var accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      currentAccount = accounts[0];
+      showMainPanel();
+    } else {
+      setLoadStatus("Ready. Click Sign in to begin.");
+    }
+    var d = $("classDate");
+    if (d) d.valueAsDate = new Date();
+  } catch (e) {
+    console.error("init failed:", e);
+    setLoadStatus("Initialization error: " + e.message);
+  }
+}
+
+async function signIn(){
+  if (!msalInstance) {
+    setLoadStatus("Sign-in library not loaded yet. Please reload the page.");
+    return;
+  }
+  try {
+    var result = await msalInstance.loginPopup({ scopes: CONFIG.scopes });
+    currentAccount = result.account;
+    showMainPanel();
+  } catch (e) {
+    console.error("Sign-in failed:", e);
+    setLoadStatus("Sign-in failed: " + e.message);
+  }
+}
+
+function showMainPanel(){
+  $("signinPanel").classList.add("hidden");
+  $("mainPanel").classList.remove("hidden");
+  $("signedAs").innerHTML = "Signed in as <strong>" + currentAccount.username + "</strong>";
+}
+
+async function getToken(){
+  try {
+    var resp = await msalInstance.acquireTokenSilent({
+      scopes: CONFIG.scopes,
+      account: currentAccount
+    });
+    return resp.accessToken;
+  } catch (e) {
+    var resp2 = await msalInstance.acquireTokenPopup({ scopes: CONFIG.scopes });
+    return resp2.accessToken;
+  }
 }
 
 function fmtSize(bytes){
-  if (!bytes) return '';
-  if (bytes < 1024*1024) return (bytes/1024).toFixed(0) + ' KB';
-  if (bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(1) + ' MB';
-  return (bytes/(1024*1024*1024)).toFixed(2) + ' GB';
+  if (!bytes) return "";
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(0) + " KB";
+  if (bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(1) + " MB";
+  return (bytes/(1024*1024*1024)).toFixed(2) + " GB";
 }
 
-function fmtDate(iso){
-  const d = new Date(iso);
-  return d.toLocaleString();
+function fmtDate(iso){ return new Date(iso).toLocaleString(); }
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, function(c){
+    return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c];
+  });
+}
+
+function generatePasscode(){
+  var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  var code = "";
+  for (var i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
 }
 
 async function findRecordings(){
-  const dateStr = document.getElementById('classDate').value;
-  if (!dateStr){ setStatus('Pick a class date first.', 'error'); return; }
-  document.getElementById('filesContainer').classList.add('hidden');
-  document.getElementById('resultContainer').classList.add('hidden');
-  setStatus('Searching OneDrive…', 'info');
-
+  var dateStr = $("classDate").value;
+  if (!dateStr) { setStatus("Pick a class date first.", "error"); return; }
+  $("filesContainer").classList.add("hidden");
+  $("resultContainer").classList.add("hidden");
+  setStatus("Searching OneDrive…", "info");
   try {
-    const token = await getToken();
-    const folderPath = encodeURIComponent(CONFIG.recordingsFolder);
-    // List children, expand top 200, get a few fields
-    const url = `https://graph.microsoft.com/v1.0/me/drive/root:/${folderPath}:/children?$top=200&$select=id,name,createdDateTime,lastModifiedDateTime,size,file,folder,webUrl&$orderby=createdDateTime desc`;
-    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (!resp.ok){
-      const err = await resp.text();
-      throw new Error(`Graph API error ${resp.status}: ${err}`);
+    var token = await getToken();
+    var url = "https://graph.microsoft.com/v1.0/me/drive/root:/" + encodeURIComponent(CONFIG.recordingsFolder) +
+      ":/children?$top=200&$select=id,name,createdDateTime,lastModifiedDateTime,size,file,folder,webUrl&$orderby=createdDateTime%20desc";
+    var resp = await fetch(url, { headers: { Authorization: "Bearer " + token } });
+    if (!resp.ok) {
+      var err = await resp.text();
+      throw new Error("Graph API " + resp.status + ": " + err);
     }
-    const data = await resp.json();
-    const all = (data.value || []).filter(f => f.file);  // only files
-    // Filter by creation date matching the selected day (local timezone)
-    const target = new Date(dateStr + 'T00:00:00');
-    const targetEnd = new Date(target.getTime() + 24*3600*1000);
-    candidateFiles = all.filter(f => {
-      const c = new Date(f.createdDateTime);
+    var data = await resp.json();
+    var all = (data.value || []).filter(function(f){ return f.file; });
+    var target = new Date(dateStr + "T00:00:00");
+    var targetEnd = new Date(target.getTime() + 24*3600*1000);
+    candidateFiles = all.filter(function(f){
+      var c = new Date(f.createdDateTime);
       return c >= target && c < targetEnd;
     });
-
-    if (candidateFiles.length === 0){
-      setStatus(`No recordings found created on ${dateStr}. Found ${all.length} files in the folder total. Try a different date or check the file's creation date in OneDrive.`, 'error');
+    if (candidateFiles.length === 0) {
+      setStatus("No recordings found created on " + dateStr + ". Folder has " + all.length + " files total.", "error");
       return;
     }
     clearStatus();
+    selectedFile = null;
     renderFileList();
-    document.getElementById('filesContainer').classList.remove('hidden');
-    // Auto-select if only one
-    if (candidateFiles.length === 1){
-      selectFile(0);
-    }
+    $("filesContainer").classList.remove("hidden");
+    if (candidateFiles.length === 1) selectFile(0);
   } catch (e) {
-    setStatus('Error: ' + e.message, 'error');
+    setStatus("Error: " + e.message, "error");
   }
 }
 
 function renderFileList(){
-  const list = document.getElementById('fileList');
-  list.innerHTML = '';
-  candidateFiles.forEach((f, i)=>{
-    const div = document.createElement('div');
-    div.className = 'file-option' + (selectedFile === i ? ' selected' : '');
-    div.onclick = ()=>selectFile(i);
-    div.innerHTML = `
-      <input type="radio" name="fileChoice" ${selectedFile === i ? 'checked' : ''}>
-      <div class="file-info">
-        <div class="file-name">${escapeHtml(f.name)}</div>
-        <div class="file-meta">Created ${fmtDate(f.createdDateTime)} · ${fmtSize(f.size)}</div>
-      </div>
-    `;
+  var list = $("fileList");
+  list.innerHTML = "";
+  candidateFiles.forEach(function(f, i){
+    var div = document.createElement("div");
+    div.className = "file-option" + (selectedFile === i ? " selected" : "");
+    div.onclick = function(){ selectFile(i); };
+    div.innerHTML =
+      '<input type="radio" name="fc" ' + (selectedFile === i ? "checked" : "") + '>' +
+      '<div class="file-info">' +
+        '<div class="file-name">' + escapeHtml(f.name) + '</div>' +
+        '<div class="file-meta">Created ' + fmtDate(f.createdDateTime) + ' &middot; ' + fmtSize(f.size) + '</div>' +
+      '</div>';
     list.appendChild(div);
   });
 }
@@ -273,76 +294,66 @@ function selectFile(i){
   renderFileList();
 }
 
-function escapeHtml(s){
-  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-function generatePasscode(){
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';  // skip ambiguous chars
-  let code = '';
-  for (let i = 0; i < 6; i++){
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
-
 async function generateLinkAndEmail(){
-  if (selectedFile === null){ setStatus('Pick a recording first.', 'error'); return; }
-  const email = document.getElementById('studentEmail').value.trim();
-  if (!email){ setStatus('Enter the student email first.', 'error'); return; }
-  setStatus('Creating share link…', 'info');
-
+  if (selectedFile === null) { setStatus("Pick a recording first.", "error"); return; }
+  var email = $("studentEmail").value.trim();
+  if (!email) { setStatus("Enter the student email first.", "error"); return; }
+  setStatus("Creating share link…", "info");
   try {
-    const token = await getToken();
-    const file = candidateFiles[selectedFile];
-    const passcode = generatePasscode();
-    const expiry = new Date(Date.now() + CONFIG.linkExpiryDays * 24 * 3600 * 1000);
-
-    const linkResp = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${file.id}/createLink`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    var token = await getToken();
+    var file = candidateFiles[selectedFile];
+    var passcode = generatePasscode();
+    var expiry = new Date(Date.now() + CONFIG.linkExpiryDays * 24 * 3600 * 1000);
+    var linkResp = await fetch("https://graph.microsoft.com/v1.0/me/drive/items/" + file.id + "/createLink", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
       body: JSON.stringify({
-        type: 'view',
-        scope: 'anonymous',
+        type: "view",
+        scope: "anonymous",
         password: passcode,
-        expirationDateTime: expiry.toISOString(),
-      }),
+        expirationDateTime: expiry.toISOString()
+      })
     });
-    if (!linkResp.ok){
-      const err = await linkResp.text();
-      throw new Error(`createLink failed ${linkResp.status}: ${err}`);
+    if (!linkResp.ok) {
+      var err = await linkResp.text();
+      throw new Error("createLink " + linkResp.status + ": " + err);
     }
-    const linkData = await linkResp.json();
-    const shareUrl = linkData.link.webUrl;
-
-    lastResult = { shareUrl, passcode, email, file, expiry };
+    var linkData = await linkResp.json();
+    lastResult = {
+      shareUrl: linkData.link.webUrl,
+      passcode: passcode,
+      email: email,
+      file: file,
+      expiry: expiry
+    };
     clearStatus();
     showResult();
   } catch (e) {
-    setStatus('Error: ' + e.message, 'error');
+    setStatus("Error: " + e.message, "error");
   }
 }
 
 function showResult(){
-  document.getElementById('filesContainer').classList.add('hidden');
-  document.getElementById('passcodeValue').textContent = lastResult.passcode;
-  document.getElementById('linkValue').innerHTML = `<strong>Link:</strong> <a href="${lastResult.shareUrl}" target="_blank">${lastResult.shareUrl}</a><br><strong>Expires:</strong> ${lastResult.expiry.toLocaleString()}`;
-  document.getElementById('resultContainer').classList.remove('hidden');
-  // Auto-open email draft
+  $("filesContainer").classList.add("hidden");
+  $("passcodeValue").textContent = lastResult.passcode;
+  $("linkValue").innerHTML =
+    "<strong>Link:</strong> <a href=\"" + lastResult.shareUrl + "\" target=\"_blank\">" + lastResult.shareUrl + "</a><br>" +
+    "<strong>Expires:</strong> " + lastResult.expiry.toLocaleString();
+  $("resultContainer").classList.remove("hidden");
   setTimeout(openEmailDraft, 200);
 }
 
 function openEmailDraft(){
-  const { shareUrl, email, file, expiry } = lastResult;
-  const classDateStr = document.getElementById('classDate').value;
-  const subject = 'Apex RN Prep — Class Recording';
-  const body = `Hi,
-
-Here is the link to the class recording from ${classDateStr}:
-
-${shareUrl}
-
-The passcode will be sent separately via text. The link expires on ${expiry.toLocaleString()}.
-
-— Apex RN Prep`;
-  const mailto = `mailto:${encodeURIComponent(email)}
+  if (!lastResult) return;
+  var classDateStr = $("classDate").value;
+  var subject = "Apex RN Prep — Class Recording";
+  var body =
+    "Hi,\n\n" +
+    "Here is the link to the class recording from " + classDateStr + ":\n\n" +
+    lastResult.shareUrl + "\n\n" +
+    "The passcode will be sent separately via text. The link expires on " + lastResult.expiry.toLocaleString() + ".\n\n" +
+    "— Apex RN Prep";
+  var mailto = "mailto:" + encodeURIComponent(lastResult.email) +
+               "?subject=" + encodeURIComponent(subject) +
+               "&body=" + encodeURIComponent(body);
+  window.l
