@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apex RN Prep — Internal Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Montserrat', 'Segoe UI', sans-serif;
+  background: #eef2f7;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HEADER ── */
+header {
+  background: linear-gradient(135deg, #0a1255 0%, #1a2d7a 60%, #0e1a60 100%);
+  padding: 28px 40px 32px;
+  position: relative;
+  overflow: hidden;
+}
+header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 20% 50%, rgba(212,175,55,0.08) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 50%, rgba(77,184,176,0.06) 0%, transparent 60%);
+  pointer-events: none;
+}
+.header-inner {
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  position: relative;
+}
+.logo-block { display: flex; flex-direction: column; }
+.logo-top {
+  display: flex; align-items: center; gap: 10px;
+}
+.logo-icon {
+  width: 44px; height: 44px;
+  background: rgba(77,184,176,0.15);
+  border: 1.5px solid rgba(77,184,176,0.4);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+}
+.logo-text {
+  font-size: 26px;
+  font-weight: 800;
+  color: #4DB8B0;
+  letter-spacing: 0.5px;
+}
+.logo-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 2px;
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+.header-divider {
+  width: 1px; height: 42px;
+  background: rgba(255,255,255,0.15);
+  margin: 0 4px;
+}
+.header-title h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+}
+.header-title p {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  margin-top: 3px;
+}
+
+/* Gold accent bar */
+.gold-bar {
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #D4AF37 20%, #F5D060 50%, #D4AF37 80%, transparent);
+}
+
+/* ── MAIN ── */
+main {
+  flex: 1;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 20px 60px;
+  width: 100%;
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9ca3af;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+/* ── TOOL CARDS ── */
+.tool-card {
+  background: white;
+  border-radius: 16px;
+  padding: 28px 24px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+  border: 1.5px solid transparent;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.22s ease;
+  position: relative;
+  overflow: hidden;
+}
+.tool-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #D4AF37, #F5D060, #D4AF37);
+  opacity: 0;
+  transition: opacity 0.22s;
+}
+.tool-card:not(.coming-soon):hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.13);
+  border-color: rgba(212,175,55,0.3);
+}
+.tool-card:not(.coming-soon):hover::after { opacity: 1; }
+
+.card-icon {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  margin-bottom: 18px;
+}
+.icon-blue  { background: #eff6ff; }
+.icon-gold  { background: #fffbeb; }
+.icon-teal  { background: #f0fdf9; }
+
+.card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a2d5a;
+  margin-bottom: 8px;
+}
+.card-desc {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.6;
+  flex: 1;
+  margin-bottom: 22px;
+}
+
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+.tag-blue { background: #eff6ff; color: #1d4ed8; }
+.tag-gold { background: #fffbeb; color: #92400e; }
+.tag-teal { background: #f0fdf9; color: #065f46; }
+
+.card-btn {
+  display: block;
+  text-align: center;
+  padding: 11px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.18s;
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+}
+.btn-primary {
+  background: #1a2d5a;
+  color: white;
+}
+.btn-primary:hover { background: #243e7a; }
+
+.coming-soon .card-btn {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.badge-coming {
+  position: absolute;
+  top: 16px; right: 16px;
+  background: #f3f4f6;
+  color: #9ca3af;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+/* ── FOOTER ── */
+footer {
+  text-align: center;
+  padding: 20px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+footer span { color: #4DB8B0; font-weight: 600; }
+
+@media (max-width: 680px) {
+  .tools-grid { grid-template-columns: 1fr; }
+  .header-inner { flex-direction: column; align-items: flex-start; }
+  .header-divider { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo-block">
+      <div class="logo-top">
+        <div class="logo-icon">🏥</div>
+        <div class="logo-text">APEX RN PREP</div>
+      </div>
+      <div class="logo-sub">Internal Tools</div>
+    </div>
+    <div class="header-divider"></div>
+    <div class="header-title">
+      <h1>Staff Tools Hub</h1>
+      <p>Generate certificates, winner posts &amp; more</p>
+    </div>
+  </div>
+</header>
+<div class="gold-bar"></div>
+
+<main>
+  <p class="section-label">Available Tools</p>
+
+  <div class="tools-grid">
+
+    <!-- Certificate Generator -->
+    <div class="tool-card">
+      <div class="card-icon icon-blue">📜</div>
+      <div class="card-title">Certificate Generator</div>
+      <div class="card-desc">Generate a personalized PDF certificate of completion for any student. Enter name and course dates — downloads instantly.</div>
+      <div class="card-meta">
+        <span class="tag tag-blue">PDF Output</span>
+      </div>
+      <a class="card-btn btn-primary" href="ApexRNPrep_CertificateGenerator.html">Open Tool →</a>
+    </div>
+
+    <!-- Winner Post Generator -->
+    <div class="tool-card">
+      <div class="card-icon icon-gold">🏆</div>
+      <div class="card-title">Winner Post Generator</div>
+      <div class="card-desc">Create Instagram-ready winner announcement posts. Upload a student photo, enter their details, and download a branded 1080×1350 image.</div>
+      <div class="card-meta">
+        <span class="tag tag-gold">PNG Output</span>
+        <span class="tag tag-gold">Instagram</span>
+      </div>
+      <a class="card-btn btn-primary" href="ApexRNPrep_WinnerPostGenerator.html">Open Tool →</a>
+    </div>
+
+    <!-- Class Recording Links -->
+    <div class="tool-card">
+      <div class="card-icon icon-teal">🎥</div>
+      <div class="card-title">Class Recording Links</div>
+      <div class="card-desc">Generate secure, time-limited OneDrive sharing links for recorded class sessions. Pick a class date and student email — link + passcode delivered in seconds.</div>
+      <div class="card-meta">
+        <span class="tag tag-teal">OneDrive</span>
+        <span class="tag tag-teal">Time-Limited</span>
+      </div>
+      <a class="card-btn btn-primary" href="ApexRNPrep_RecordingTool.html">Open Tool →</a>
+    </div>
+</main>
+
+<footer>
+  Apex RN Prep Internal Tools &nbsp;·&nbsp; <span>apexrnprep.com</span> &nbsp;·&nbsp; +1-813-330-1460
+</footer>
+
+</body>
+</html>
