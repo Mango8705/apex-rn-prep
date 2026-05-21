@@ -46,7 +46,7 @@ input:focus,select:focus{border-color:#1a2d5a}
 <div class="app">
   <div class="panel">
     <h2>Winner Post Generator</h2>
-    <p class="version">v66 &mdash; May 2026</p>
+    <p class="version">v67 &mdash; May 2026</p>
     <hr>
     <label>Background Color</label>
     <select id="bgColor" onchange="changeBg()">
@@ -94,7 +94,7 @@ input:focus,select:focus{border-color:#1a2d5a}
       <label>Photo position (drag photo in preview to move, slider to zoom)</label>
       <div class="zoom-row">
         <span style="font-size:11px;color:#6b7280">1×</span>
-        <input type="range" id="photoZoom" min="1" max="4" step="0.05" value="1">
+        <input type="range" id="photoZoom" min="1" max="4" step="0.05" value="1.15">
         <span style="font-size:11px;color:#6b7280">4×</span>
         <button class="reset-btn" id="photoResetBtn" type="button">Reset</button>
       </div>
@@ -118,7 +118,7 @@ const TMPL_PURPLE_B64="iVBORw0KGgoAAAANSUhEUgAAArwAAANqCAIAAADgyA+SAAEAAElEQVR4n
 const TMPL_MAP={navy:TMPL_B64, burgundy:TMPL_BURGUNDY_B64, green:TMPL_GREEN_B64, purple:TMPL_PURPLE_B64};
 const tmplImg=new Image();tmplImg.src='data:image/png;base64,'+TMPL_B64;
 let photoImg=null,renderTimer=null;
-let photoOffsetX=0,photoOffsetY=0,photoZoom=1.0;
+let photoOffsetX=0,photoOffsetY=0,photoZoom=1.15;
 let _dragging=false,_dragStartCX=0,_dragStartCY=0,_dragStartOffX=0,_dragStartOffY=0;
 let _rafScheduled=false;
 function scheduleRender(){
@@ -135,8 +135,8 @@ function handlePhoto(e){
   const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=ev=>{const img=new Image();img.onload=()=>{photoImg=img;
-    photoOffsetX=0;photoOffsetY=0;photoZoom=1.0;
-    const zs=document.getElementById('photoZoom');if(zs)zs.value=1;
+    photoOffsetX=0;photoOffsetY=0;photoZoom=1.15;
+    const zs=document.getElementById('photoZoom');if(zs)zs.value=1.15;
     const pc=document.getElementById('photoControls');if(pc)pc.classList.remove('hidden-when-empty');
     const cnv=document.getElementById('previewCanvas');if(cnv)cnv.classList.remove('nophoto');
     const th=document.getElementById('photoThumb');th.src=ev.target.result;th.style.display='block';
@@ -144,8 +144,8 @@ function handlePhoto(e){
     document.getElementById('upLabel').textContent='Photo ready ✓';go();};
     img.src=ev.target.result;};reader.readAsDataURL(file);}
 function resetPhotoTransform(){
-  photoOffsetX=0;photoOffsetY=0;photoZoom=1.0;
-  const zs=document.getElementById('photoZoom');if(zs)zs.value=1;
+  photoOffsetX=0;photoOffsetY=0;photoZoom=1.15;
+  const zs=document.getElementById('photoZoom');if(zs)zs.value=1.15;
   go();
 }
 function go(){clearTimeout(renderTimer);renderTimer=setTimeout(render,80);}
@@ -189,7 +189,7 @@ async function render(){
     // OVERSCAN ensures the smaller dimension ends up at least 1.15x the circle diameter.
     const OVERSCAN=1.15;
     const coverScale=Math.max((CR*2)/photoImg.width,(CR*2)/photoImg.height);
-    const baseS=Math.max(1, coverScale*OVERSCAN);
+    const baseS=coverScale; /* photoZoom=1 => photo exactly covers the circle */
     const s=baseS*photoZoom;
     const w=photoImg.width*s, h=photoImg.height*s;
     // Clamp so the photo always covers the circle (no exposed navy inside the ring)
@@ -301,7 +301,7 @@ function dlPost(){
   document.addEventListener('touchcancel',function(e){ endDrag(); });
   // Zoom slider + reset
   const zs=document.getElementById('photoZoom');
-  if(zs)zs.addEventListener('input',function(){photoZoom=parseFloat(this.value)||1;scheduleRender();});
+  if(zs)zs.addEventListener('input',function(){photoZoom=parseFloat(this.value)||1.15;scheduleRender();});
   const rb=document.getElementById('photoResetBtn');
   if(rb)rb.addEventListener('click',resetPhotoTransform);
 })();
